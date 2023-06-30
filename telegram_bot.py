@@ -9,6 +9,10 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
+# Variaveis
+
+bot_telegram = 'SEU_BOT'
+
 # Variáveis de conexão SSH para olt
 olt_host = 'host'
 olt_username = 'user'
@@ -170,7 +174,7 @@ def offpppoe(update, context):
         
 def main():
     # Configuração do bot
-    updater = Updater(token='SEUBOT', use_context=True)
+    updater = Updater(token='bot_telegram', use_context=True)
     dispatcher = updater.dispatcher
 
     # Registro do handler para o comando /start
