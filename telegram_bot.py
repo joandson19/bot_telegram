@@ -175,7 +175,7 @@ def offpppoe(update, context):
         
 def main():
     # Configuração do bot
-    updater = Updater(token='bot_telegram', use_context=True)
+    updater = Updater(token=bot_telegram, use_context=True)
     dispatcher = updater.dispatcher
 
     # Registro do handler para o comando /start
