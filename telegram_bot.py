@@ -29,7 +29,8 @@ def start(update, context):
               "Você pode usar os seguintes comandos:\n" \
               "/ping [host] - Executa um ping para o host especificado.\n" \
               "/mtr [host] - Executa um MTR (traceroute) para o host especificado.\n" \
-              "/sinalonu [interface]-[ONU] - Obtém informações ópticas da ONU em uma interface específica."
+              "/sinalonu [interface]-[ONU] - Obtém informações ópticas da ONU em uma interface específica. \n" \
+              "/pingpppoe [login do pppoe] - Faz um ping no ip do login pppoe e retorna o resultado."
 
     context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
