@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import paramiko
+import re
 from telegram.ext import Updater, CommandHandler
 
 # Configuração do registro de log
@@ -30,7 +31,7 @@ def start(update, context):
               "/ping [host] - Executa um ping para o host especificado.\n" \
               "/mtr [host] - Executa um MTR (traceroute) para o host especificado.\n" \
               "/sinalonu [interface]-[ONU] - Obtém informações ópticas da ONU em uma interface específica. \n" \
-              "/pingpppoe [login do pppoe] - Faz um ping no ip do login pppoe e retorna o resultado."
+              "/onu [login do cliente] - Obtém informações ópticas da ONU."
 
     context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
@@ -173,6 +174,60 @@ def offpppoe(update, context):
         # Fecha a conexão SSH
         mikrotik_client.close()        
         
+def onu(update, context):
+    # Verifica se o argumento do comando foi fornecido
+    if len(context.args) == 0:
+        message = "Você precisa fornecer o LOGIN do cliente após o comando /onu."
+        context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+        return
+        
+    # Obtém o nome do cliente a partir do comando
+    cliente = context.args[0]
+
+    # Cria uma conexão SSH
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    try:
+        # Conecta à OLT via SSH
+        client.connect(hostname=olt_host, username=olt_username, password=olt_password)
+
+        # Executa o comando para obter a interface e número da ONU do cliente
+        command = 'show interface gpon onu | include ' + cliente
+        stdin, stdout, stderr = client.exec_command(command)
+        output = stdout.read().decode('utf-8')
+
+        # Verifica se o comando retornou algum resultado
+        if output:
+            # Extrai a interface e número da ONU do resultado
+            match = re.search(r'(\d+/\d+/\d+)\s+(\d+)\s+\S+\s+Up', output)
+            if match:
+                interface = match.group(1)
+                onu = match.group(2)
+
+                # Executa o comando para obter o sinal da ONU do cliente
+                command = f'show interface gpon {interface} onu {onu} optical-info'
+                stdin, stdout, stderr = client.exec_command(command)
+                output = stdout.read().decode('utf-8')
+
+                # Envia a saída do comando como mensagem de resposta
+                context.bot.send_message(chat_id=update.effective_chat.id, text=output)
+            else:
+                message = f'Cliente {cliente} não encontrado.'
+                context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+        else:
+            message = f'Cliente {cliente} não encontrado.'
+            context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+
+    except paramiko.AuthenticationException:
+        context.bot.send_message(chat_id=update.effective_chat.id, text='Falha na autenticação SSH.')
+    except paramiko.SSHException:
+        context.bot.send_message(chat_id=update.effective_chat.id, text='Erro na conexão SSH.')
+    finally:
+        # Fecha a conexão SSH
+        client.close()
+
+
 def main():
     # Configuração do bot
     updater = Updater(token=bot_telegram, use_context=True)
@@ -201,6 +256,11 @@ def main():
     # Registro do handler para o comando /offpppoe
     offpppoe_handler = CommandHandler('offpppoe', offpppoe)
     dispatcher.add_handler(offpppoe_handler)
+    
+    # Registro do handler para o comando /onu
+    onu_handler = CommandHandler('onu', onu)
+    dispatcher.add_handler(onu_handler)
+
 
     # Iniciar o bot
     updater.start_polling()
