@@ -170,7 +170,7 @@ def offpppoe(update, context):
         
 def main():
     # Configuração do bot
-    updater = Updater(token='492230424:AAH70Sd-J1trfPiFrUbDrECVOEN-FzhORsY', use_context=True)
+    updater = Updater(token='SEUBOT', use_context=True)
     dispatcher = updater.dispatcher
 
     # Registro do handler para o comando /start
