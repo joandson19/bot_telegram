@@ -10,14 +10,14 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # Variáveis de conexão SSH para olt
-olt_host = '100.127.250.7'
-olt_username = 'joandson'
-olt_password = 'nino190361'
+olt_host = 'host'
+olt_username = 'user'
+olt_password = 'pass'
 
 # Variaveis para conexão SSH para o MikroTik
-mikrotik_host = '100.126.2.2'
-mikrotik_username = 'joandson'
-mikrotik_password = 'nino190361'
+mikrotik_host = 'host'
+mikrotik_username = 'user'
+mikrotik_password = 'pass'
 
 # Função para tratar o comando /start
 def start(update, context):
