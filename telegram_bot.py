@@ -2,6 +2,7 @@ import logging
 import subprocess
 import paramiko
 import re
+import dns.resolver
 from telegram.ext import Updater, CommandHandler
 
 # Configuração do registro de log
@@ -66,32 +67,34 @@ def dig(update, context):
         message = 'Ocorreu um erro ao processar a consulta DNS.'
         context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
-# Função para tratar o comando /whois
-def whois_cmd(update, context):
+# Função para tratar a consulta WHOIS
+def whois(update, context):
     # Obtém o domínio a partir do comando
     domain = context.args[0]
 
     try:
-        # Realiza uma consulta WHOIS para o domínio
-        result = whois.whois(domain)
+        # Executa a consulta WHOIS
+        whois_result = subprocess.check_output(['whois', domain]).decode('utf-8')
 
-        # Obtém as informações WHOIS relevantes
-        registrar = result.registrar
-        creation_date = result.creation_date
-        expiration_date = result.expiration_date
+        # Define um limite máximo de caracteres para cada mensagem (por exemplo, 4000 caracteres)
+        max_characters = 4000
 
-        # Formata as informações para exibição
-        message = f'Domínio: {domain}\n' \
-                  f'Registrador: {registrar}\n' \
-                  f'Data de criação: {creation_date}\n' \
-                  f'Data de expiração: {expiration_date}'
+        if len(whois_result) > max_characters:
+            # Se o texto exceder o limite, divide-o em várias mensagens
+            messages = [whois_result[i:i+max_characters] for i in range(0, len(whois_result), max_characters)]
 
-        # Envia a resposta com as informações WHOIS
-        context.bot.send_message(chat_id=update.effective_chat.id, text=message)
-    except Exception:
-        # Envia uma mensagem de erro genérico se ocorrer uma exceção na consulta WHOIS
-        message = 'Ocorreu um erro ao processar a consulta WHOIS.'
-        context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+            # Envia a mensagem inicial informando que o resultado será enviado em partes
+            context.bot.send_message(chat_id=update.effective_chat.id, text='O resultado do WHOIS é muito grande. Será enviado em partes.')
+
+            # Envia as mensagens subsequentes com o resultado do WHOIS
+            for message in messages:
+                context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+        else:
+            # Se o texto não exceder o limite, envia-o como uma única mensagem
+            context.bot.send_message(chat_id=update.effective_chat.id, text=whois_result)
+
+    except subprocess.CalledProcessError:
+        context.bot.send_message(chat_id=update.effective_chat.id, text='Ocorreu um erro ao processar a consulta WHOIS.')
 
 # Função para tratar o comando /ping
 def ping(update, context):
@@ -324,7 +327,7 @@ def main():
     dispatcher.add_handler(dig_handler)
 
     # Registro do handler para o comando /whois
-    whois_handler = CommandHandler('whois', whois_cmd)
+    whois_handler = CommandHandler('whois', whois)
     dispatcher.add_handler(whois_handler)
 
 
