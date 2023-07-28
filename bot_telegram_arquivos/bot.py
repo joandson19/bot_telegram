@@ -101,21 +101,23 @@ def download_file_or_navigate(call):
 @bot.message_handler(content_types=['document'])
 def receive_file(message):
     if is_user_authorized(message.chat.id):
-        file_info = bot.get_file(message.document.file_id)
+        # Obtém o nome original do arquivo enviado
+        file_name = message.document.file_name
 
         # Armazena o arquivo na variável global para confirmação
-        file_to_confirm[message.chat.id] = file_info
+        file_to_confirm[message.chat.id] = (file_name, message.document.file_id)
 
-        # Cria os botõesde confirmação
+        # Cria os botões de confirmação
         keyboard = InlineKeyboardMarkup(row_width=2)
         button_yes = InlineKeyboardButton(text="Sim", callback_data="confirmar")
         button_no = InlineKeyboardButton(text="Não", callback_data="cancelar")
         keyboard.add(button_yes, button_no)
 
         # Envia a mensagem de confirmação com os botões
-        bot.send_message(chat_id=message.chat.id, text="Deseja confirmar o envio do arquivo?", reply_markup=keyboard)
+        bot.send_message(chat_id=message.chat.id, text=f"Deseja confirmar o envio do arquivo '{file_name}'?", reply_markup=keyboard)
     else:
         bot.send_message(chat_id=message.chat.id, text="Você não está autorizado a realizar esta ação.")
+
 
 # Handler para processar o callback de confirmação
 @bot.callback_query_handler(func=lambda call: call.data in ["confirmar", "cancelar"])
@@ -124,19 +126,17 @@ def process_confirmation(call):
 
     if is_user_authorized(chat_id):
         if chat_id in file_to_confirm:
-            file_info = file_to_confirm.pop(chat_id)
+            file_name, file_id = file_to_confirm.pop(chat_id)
 
             if call.data == "confirmar":
                 # Baixa o arquivo
+                file_info = bot.get_file(file_id)
                 downloaded_file = bot.download_file(file_info.file_path)
-
-                # Recupera o nome do arquivo
-                file_name = file_info.file_path.split('/')[-1]
 
                 # Obtém o caminho da pasta onde o arquivo deve ser salvo (usando o current_path)
                 current_folder_path = current_path.get(chat_id, FOLDER_PATH)
 
-                # Salva o arquivo na pasta correta
+                # Salva o arquivo na pasta correta com o nome original
                 file_path = os.path.join(current_folder_path, file_name)
                 with open(file_path, 'wb') as file:
                     file.write(downloaded_file)
