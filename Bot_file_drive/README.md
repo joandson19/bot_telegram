@@ -34,7 +34,7 @@ Este repositório contém o código-fonte de um bot do Telegram desenvolvido em 
 * Certifique-se de conceder as permissões necessárias ao bot no grupo ou canal em que ele será utilizado.
 
 # Aviso:
-Este bot foi desenvolvido com fins educacionais e para demonstração de conceitos de programação com a API do Telegram e manipulação de arquivos em Python. Não garantimos a segurança ou escalabilidade completa deste código para uso em produção. Use-o por sua conta e risco.
+Este bot foi desenvolvido com fins de uso próprio para estudos e de conceitos de programação com a API do Telegram e manipulação de arquivos em Python. Não garantimos a segurança ou escalabilidade completa deste código para uso em produção. Use-o por sua conta e risco.
 
 # Contribuições:
 Contribuições são bem-vindas! Se você identificar bugs, melhorias ou novos recursos a serem adicionados, fique à vontade para abrir problemas (issues) ou enviar um pull request.
