@@ -1,14 +1,15 @@
-import os # útil demais, não toque nele
+import os
 import emoji # útil para adicionar emoji nas pastas
 import shutil # Util para apagar diretórios
-import telebot # útil demais, não toque nele
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton # útil demais, não toque nele
+import telebot
+import zipfile
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Defina a chave de autenticação do bot
-AUTH_KEY = "UMA SENHA QUALQUER"
+AUTH_KEY = "SENHA ESCOLHIDA"
 
 # Pasta raiz onde os usuários terão suas pastas pessoais
-ROOT_FOLDER = "SUA PASTA ESCOLHIDA"
+ROOT_FOLDER = "PASTA ESCOLHIDA"
 
 # Crie uma instância do bot com seu token
 bot = telebot.TeleBot('TOKEN DO BOT')
@@ -56,6 +57,166 @@ def create_folder(message):
             bot.send_message(chat_id=message.chat.id, text="O comando /criarpasta requer um nome de pasta. Por favor, tente novamente.")
     else:
         bot.send_message(chat_id=message.chat.id, text="Você não está autorizado a realizar esta ação.")
+
+# Handler for the command /baixarpasta
+@bot.message_handler(commands=['baixarpasta'])
+def list_folders_to_download(message):
+    if is_user_authorized(message.chat.id):
+        # Cria a pasta do usuário se ainda não existir
+        user_folder = create_user_folder(message.chat.id)
+
+        # Get the current path for the user
+        path = current_path.get(message.chat.id, user_folder)
+
+        folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+
+        if folders:
+            keyboard = InlineKeyboardMarkup(row_width=1)
+            for folder_name in folders:
+                folder_with_emoji = f"{emoji.emojize(':file_folder:')} {folder_name}"
+                button = InlineKeyboardButton(text=folder_with_emoji, callback_data=f"baixar_pasta:{folder_name}")
+                keyboard.add(button)
+
+            # Add a button for navigating back if the current path is not the user's folder
+            if path != user_folder:
+                back_button = InlineKeyboardButton(text="↩️ Voltar", callback_data="voltar")
+                keyboard.add(back_button)
+
+            bot.send_message(chat_id=message.chat.id, text="Escolha a pasta que deseja baixar:", reply_markup=keyboard)
+        else:
+            # Folder is empty, show "↩️ Voltar" button to navigate back
+            keyboard = InlineKeyboardMarkup(row_width=1)
+            back_button = InlineKeyboardButton(text="↩️ Voltar", callback_data="voltar")
+            keyboard.add(back_button)
+            bot.send_message(chat_id=message.chat.id, text="Não há pastas disponíveis para baixar.", reply_markup=keyboard)
+    else:
+        bot.send_message(chat_id=message.chat.id, text="Você não está autorizado a realizar esta ação.")
+
+
+# Handler para processar o callback de escolha de pasta para baixar
+@bot.callback_query_handler(func=lambda call: call.data.startswith('baixar_pasta:'))
+def download_selected_folder(call):
+    if is_user_authorized(call.message.chat.id):
+        user_id = call.message.chat.id
+        
+        # Obtém a pasta do usuário
+        user_folder = create_user_folder(user_id)
+
+        folder_name = call.data.split(':')[1]
+        folder_path = os.path.join(current_path.get(user_id, user_folder), folder_name)
+
+        if os.path.exists(folder_path) and os.path.isdir(folder_path):
+            # Compacta a pasta em um arquivo zip temporário
+            temp_zip_path = os.path.join(user_folder, folder_name + ".zip")
+            with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, _, files in os.walk(folder_path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path, folder_path)
+                        zipf.write(file_path, arcname)
+
+            # Envia o arquivo zip para o usuário
+            with open(temp_zip_path, 'rb') as zip_file:
+                bot.send_document(call.message.chat.id, zip_file)
+
+            # Remove o arquivo zip temporário
+            os.remove(temp_zip_path)
+
+            bot.send_message(chat_id=user_id, text=f"Pasta '{folder_name}' baixada com sucesso.")
+        else:
+            bot.send_message(chat_id=user_id, text=f"A pasta '{folder_name}' não existe ou não é uma pasta.")
+    else:
+        bot.send_message(chat_id=call.message.chat.id, text="Você não está autorizado a realizar esta ação.")
+        
+# Dicionário para armazenar temporariamente os itens disponíveis para renomear
+items_to_rename = {}
+
+# Handler para o comando /renomear
+@bot.message_handler(commands=['renomear'])
+def list_items_to_rename(message):
+    if is_user_authorized(message.chat.id):
+        # Obtém a pasta atual do usuário
+        user_folder = create_user_folder(message.chat.id)
+        current_user_folder = current_path.get(message.chat.id, user_folder)
+
+        files = os.listdir(current_user_folder)
+        items_to_rename[message.chat.id] = {}  # Armazena os itens disponíveis no dicionário
+
+        if files:
+            keyboard = InlineKeyboardMarkup(row_width=1)
+            for item_name in files:
+                is_directory = os.path.isdir(os.path.join(current_user_folder, item_name))
+                item_name_with_emoji = f"{emoji.emojize(':file_folder:')} {item_name}" if is_directory else item_name
+
+                # Adjust the file name if it's too long
+                MAX_CHARACTERS = 15
+                if len(item_name) > MAX_CHARACTERS:
+                    truncated_name = item_name[:MAX_CHARACTERS] + "..." + item_name[-4:]
+                    items_to_rename[message.chat.id][truncated_name] = item_name  # Armazena a correspondência de nomes
+                    item_name_with_emoji = truncated_name
+
+                # Add buttons for renaming each item
+                button = InlineKeyboardButton(text=item_name_with_emoji, callback_data=f"escolher_renomear:{item_name_with_emoji}")
+                keyboard.add(button)
+
+            bot.send_message(chat_id=message.chat.id, text="Escolha o item que deseja renomear:", reply_markup=keyboard)
+        else:
+            bot.send_message(chat_id=message.chat.id, text="A pasta está vazia. Nada para renomear.")
+    else:
+        bot.send_message(chat_id=message.chat.id, text="Você não está autorizado a realizar esta ação.")
+
+
+# Handler para o callback de escolha do item para renomear
+@bot.callback_query_handler(func=lambda call: call.data.startswith('escolher_renomear:'))
+def choose_item_to_rename(call):
+    if is_user_authorized(call.message.chat.id):
+        user_id = call.message.chat.id
+        item_name = call.data.split(':')[1]
+
+        # Obtém o nome real do arquivo a partir do dicionário
+        real_name = items_to_rename.get(user_id, {}).get(item_name)
+
+        if real_name:
+            items_to_rename[user_id] = real_name
+            bot.send_message(chat_id=user_id, text=f"Digite o novo nome para '{real_name}':")
+        else:
+            bot.send_message(chat_id=user_id, text=f"Item '{item_name}' não encontrado para renomear.")
+    else:
+        bot.send_message(chat_id=call.message.chat.id, text="Você não está autorizado a realizar esta ação.")
+
+
+# Handler para receber o novo nome do item para renomear
+@bot.message_handler(func=lambda message: message.chat.id in items_to_rename and message.text)
+def receive_new_name(message):
+    if is_user_authorized(message.chat.id):
+        user_id = message.chat.id
+        new_name = message.text.strip()
+
+        if len(new_name) == 0:
+            bot.send_message(chat_id=user_id, text="O novo nome não pode estar vazio.")
+            return
+
+        # Obtém o nome real do arquivo a partir do dicionário
+        item_name = items_to_rename.get(user_id)
+
+        # Obtém a pasta atual do usuário
+        user_folder = create_user_folder(user_id)
+        current_user_folder = current_path.get(user_id, user_folder)
+
+        current_path_to_item = os.path.join(current_user_folder, item_name)
+        new_path_to_item = os.path.join(current_user_folder, new_name)
+
+        if os.path.exists(current_path_to_item):
+            os.rename(current_path_to_item, new_path_to_item)
+            bot.send_message(chat_id=user_id, text=f"Item '{item_name}' renomeado para '{new_name}'.")
+        else:
+            bot.send_message(chat_id=user_id, text=f"Item '{item_name}' não encontrado.")
+
+        # Remove o item da lista de itens para renomear no dicionário
+        del items_to_rename[user_id]
+    else:
+        bot.send_message(chat_id=message.chat.id, text="Você não está autorizado a realizar esta ação.")
+
 
 # Handler para o comando /apagar
 @bot.message_handler(commands=['apagar'])
@@ -155,11 +316,15 @@ def list_files(message):
                     # If it's a directory, add 📁 emoji before the name
                     file_name_with_emoji = f"{emoji.emojize(':file_folder:')} {file_name}"
                 else:
+                    # Adjust the file name if it's too long
+                    MAX_CHARACTERS = 15
+                    if len(file_name) > MAX_CHARACTERS:
+                        file_name = file_name[:MAX_CHARACTERS] + "..." + file_name[-4:]
                     file_name_with_emoji = file_name
 
                 button = InlineKeyboardButton(text=file_name_with_emoji, callback_data=f"baixar:{file_name}")
                 keyboard.add(button)
-            
+
             # Add a button for navigating back if the current path is not the user's folder
             if path != user_folder:
                 back_button = InlineKeyboardButton(text="↩️ Voltar", callback_data="voltar")
@@ -174,6 +339,7 @@ def list_files(message):
             bot.send_message(chat_id=message.chat.id, text="A pasta está vazia.", reply_markup=keyboard)
     else:
         bot.send_message(chat_id=message.chat.id, text="Você não está autorizado a realizar esta ação.")
+
 
 
 # Handler for the command /voltar (to navigate back to the parent folder)
@@ -225,15 +391,28 @@ def download_file_or_navigate(call):
     else:
         bot.send_message(chat_id=call.message.chat.id, text="Você não está autorizado a realizar esta ação.")
 
-# Handler para receber um arquivo
-@bot.message_handler(content_types=['document'])
+# Handler para receber qualquer tipo de arquivo
+@bot.message_handler(content_types=['document', 'photo', 'audio'])
 def receive_file(message):
     if is_user_authorized(message.chat.id):
-        # Obtém o nome original do arquivo enviado
-        file_name = message.document.file_name
+        # Obtém o arquivo enviado
+        file_id = None
+        file_name = None
+
+        if message.content_type == 'document':
+            file_id = message.document.file_id
+            file_name = message.document.file_name
+        elif message.content_type == 'photo':
+            # Para fotos, usa o file_id como nome do arquivo
+            file_id = message.photo[-1].file_id
+            file_name = file_id + '.jpg'
+        elif message.content_type == 'audio':
+            # Para áudios, usa o file_id como nome do arquivo
+            file_id = message.audio.file_id
+            file_name = file_id + '.mp3'
 
         # Armazena o arquivo na variável global para confirmação
-        file_to_confirm[message.chat.id] = (file_name, message.document.file_id)
+        file_to_confirm[message.chat.id] = (file_name, file_id)
 
         # Cria os botões de confirmação
         keyboard = InlineKeyboardMarkup(row_width=2)
@@ -245,7 +424,6 @@ def receive_file(message):
         bot.send_message(chat_id=message.chat.id, text=f"Deseja confirmar o envio do arquivo '{file_name}'?", reply_markup=keyboard)
     else:
         bot.send_message(chat_id=message.chat.id, text="Você não está autorizado a realizar esta ação.")
-
 
 # Handler para processar o callback de confirmação
 @bot.callback_query_handler(func=lambda call: call.data in ["confirmar", "cancelar"])
