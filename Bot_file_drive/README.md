@@ -1,4 +1,4 @@
-# Bot file drive
+# Telegram File Manager Bot
 Este repositório contém o código-fonte de um bot do Telegram desenvolvido em Python que funciona como um gerenciador de arquivos simples. O bot permite que os usuários criem pastas, listem arquivos e pastas, baixem arquivos e pastas, apaguem arquivos e pastas, renomeiem arquivos e pastas e enviem arquivos para armazenamento..
 
 # Funcionalidades Principais
