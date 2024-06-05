@@ -1,6 +1,6 @@
 # bot_telegram
 
-Esse é um script python de bot para o telegram que pode ser usado tanto usando o comando "pip3 telegram_bot" como rodando em container o qual eu considero melhor por ser um container isolado somente para tal função.
+Esse é um script python de bot para o telegram que pode ser usado tanto usando o comando "python3 telegram_bot" como rodando em container o qual eu considero melhor por ser um container isolado somente para tal função.
 
 Se você já tem o docker instalado e funcional então é só clonar o repositório na pasta desejada, aqui vou usar a /opt 
 
