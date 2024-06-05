@@ -6,16 +6,19 @@ import zipfile
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Defina a chave de autenticação do bot
-AUTH_KEY = "SENHA ESCOLHIDA"
+AUTH_KEY = "1234"
 
 # Pasta raiz onde os usuários terão suas pastas pessoais
-ROOT_FOLDER = "PASTA ESCOLHIDA"
+ROOT_FOLDER = "/caminho/ate/sua/pasta"
 
 # Crie uma instância do bot com seu token
-bot = telebot.TeleBot('TOKEN DO BOT')
+bot = telebot.TeleBot('Tokenbot')
 
 # Variável global para armazenar o arquivo enviado
 file_to_confirm = {}
+
+# New global variable to keep track of file names
+file_names_to_download = {}
 
 # Lista de IDs de chat dos usuários autorizados
 authorized_users = set()
@@ -319,7 +322,9 @@ def list_files(message):
                     # Adjust the file name if it's too long
                     MAX_CHARACTERS = 15
                     if len(file_name) > MAX_CHARACTERS:
+                        file_name_to_store = file_name
                         file_name = file_name[:MAX_CHARACTERS] + "..." + file_name[-4:]
+                        file_names_to_download[file_name] = file_name_to_store  # Store the real file name
                     file_name_with_emoji = file_name
 
                 button = InlineKeyboardButton(text=file_name_with_emoji, callback_data=f"baixar:{file_name}")
@@ -340,8 +345,6 @@ def list_files(message):
     else:
         bot.send_message(chat_id=message.chat.id, text="Você não está autorizado a realizar esta ação.")
 
-
-
 # Handler for the command /voltar (to navigate back to the parent folder)
 @bot.callback_query_handler(func=lambda call: call.data == "voltar")
 def navigate_back_button(call):
@@ -358,7 +361,7 @@ def navigate_back_button(call):
         bot.send_message(chat_id=call.message.chat.id, text="Você não está autorizado a realizar esta ação.")
 
 
-# Handler for the command /baixar and navigating into folders
+# Handler for the callback of downloading a file
 @bot.callback_query_handler(func=lambda call: call.data.startswith('baixar:'))
 def download_file_or_navigate(call):
     if is_user_authorized(call.message.chat.id):
@@ -382,7 +385,8 @@ def download_file_or_navigate(call):
 
         # Handle file download
         if action == 'baixar':
-            file_path = os.path.join(current_path.get(user_id, user_folder), target)
+            file_name = file_names_to_download.get(target, None) or target  # Use full file name if available, else use the given name
+            file_path = os.path.join(current_path.get(user_id, user_folder), file_name)
             if os.path.isfile(file_path):
                 with open(file_path, 'rb') as file:
                     bot.send_document(call.message.chat.id, file)
@@ -390,7 +394,7 @@ def download_file_or_navigate(call):
                 bot.send_message(chat_id=call.message.chat.id, text="Arquivo não encontrado.")
     else:
         bot.send_message(chat_id=call.message.chat.id, text="Você não está autorizado a realizar esta ação.")
-
+        
 # Handler para receber qualquer tipo de arquivo
 @bot.message_handler(content_types=['document', 'photo', 'audio'])
 def receive_file(message):
